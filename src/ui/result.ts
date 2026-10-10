@@ -49,7 +49,7 @@ export function titleOf(r: GameResult): string {
 
 export function copyText(r: GameResult): string {
   const e = r.engine;
-  return `ドキドキFX 結果：${yen(e.realized, true)}円（${e.wins}勝${e.losses}敗）称号『${titleOf(r)}』 #ドキドキFX`;
+  return `ドキドキハイ＆ロー 結果：${yen(e.realized, true)}円（${e.wins}勝${e.losses}敗）称号『${titleOf(r)}』 #ドキドキハイアンドロー`;
 }
 
 export class ResultScreen {

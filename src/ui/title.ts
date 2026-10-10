@@ -78,7 +78,7 @@ export class TitleScreen {
   private build(inner: HTMLElement, notice?: string) {
     const s = this.s;
     const logo = h('div', 'logo');
-    logo.append(h('div', 'logo-main', 'ドキドキFX'), h('div', 'logo-sub', '〜爆益チャレンジ〜'));
+    logo.append(h('div', 'logo-main', 'ドキドキハイ＆ロー'), h('div', 'logo-sub', '〜ドル円 爆益チャレンジ〜'));
     inner.append(logo);
     inner.append(h('p', 'lead', '上がる？ 下がる？ ボタンを連打して連勝をねらえ！（ゲームです．本物のお金は動きません）'));
     if (notice) inner.append(h('div', 'notice', notice));
@@ -177,6 +177,13 @@ export class TitleScreen {
     inner.append(this.achievementBook());
 
     inner.append(h('p', 'foot', '初期資金は 100,000 円（ゲーム内のおもちゃのお金）'));
+    inner.append(
+      h(
+        'p',
+        'foot',
+        'このゲームは，決めた時間で自動判定する「ハイ＆ロー（バイナリーオプション）」の遊び方に，値幅しだいで損益が変わる FX 式の計算（レバレッジ・スプレッド・ロスカット）を組み合わせたものです．本物の FX は決済のタイミングを自分で決め，本物のバイナリーオプションは当たると決まった額が払い戻されます．',
+      ),
+    );
   }
 
   private recordLine(): HTMLElement | null {

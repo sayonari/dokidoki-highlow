@@ -1,11 +1,11 @@
 {
-  "name": "dokidoki-fx",
+  "name": "dokidoki-highlow",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && cp dist/index.html ../.output/dokidoki-fx.html",
+    "build": "tsc --noEmit && vite build && cp dist/index.html ../.output/dokidoki-highlow.html",
     "preview": "vite preview",
     "simulate": "tsx scripts/simulate.ts"
   },
