@@ -1,4 +1,5 @@
 import { MODES } from '../engine/modes';
+import type { Rule } from '../engine/engine';
 import type { ModeId } from '../engine/modes';
 import { sfx } from '../audio/sfx';
 import { HAS_REPLAY, REPLAY } from '../market/replayData';
@@ -84,20 +85,30 @@ export class TitleScreen {
     if (notice) inner.append(h('div', 'notice', notice));
 
     // スタートはタイトル直下：設定を触らなくてもすぐ遊べるように
-    const start = h('button', 'start-btn');
-    start.type = 'button';
-    start.append(h('span', '', 'スタート！'));
-    start.onclick = () => {
-      sfx.unlock();
-      sfx.click('up');
-      this.refresh();
-      this.onStart(s);
-    };
-    inner.append(start);
+    const group = h('div', 'start-group');
+    const rules: { rule: Rule; cls: string; label: string; sub: string }[] = [
+      { rule: 'fx', cls: 'start-btn fx', label: '▶ FX式でスタート', sub: '損益は値動きの幅しだい' },
+      { rule: 'binary', cls: 'start-btn hilo', label: '▶ 本物のハイローでスタート', sub: '当たれば1.85倍・外れたら賭け金ぜんぶ没収' },
+      { rule: 'martingale', cls: 'start-btn mg', label: '▶ 倍賭けハイローでスタート', sub: '負けたら次は2倍（マーチンゲール）' },
+    ];
+    for (const r of rules) {
+      const b = h('button', r.cls);
+      b.type = 'button';
+      b.append(h('span', 'start-label', r.label), h('span', 'start-sub', r.sub));
+      b.onclick = () => {
+        sfx.unlock();
+        sfx.click('up');
+        s.rule = r.rule;
+        this.refresh();
+        this.onStart(s);
+      };
+      group.append(b);
+    }
+    inner.append(group);
     const summary = h('p', 'start-summary', '');
     this.refreshers.push(() => {
       const m = MODES.find((x) => x.id === s.mode)!;
-      summary.textContent = `いまの設定：${m.icon}${m.name}／${s.leverage}倍／1回${s.margin.toLocaleString('ja-JP')}円／${s.holdSec}秒で決済／${s.roundSec}秒`;
+      summary.textContent = `いまの設定：${m.icon}${m.name}／レバレッジ${s.leverage}倍（FX式のみ）／1回${s.margin.toLocaleString('ja-JP')}円／${s.holdSec}秒で決済／${s.roundSec}秒`;
     });
     inner.append(summary);
     const recLine = this.recordLine();
@@ -126,8 +137,10 @@ export class TitleScreen {
     ms.append(grid);
 
     const lev = [1, 5, 10, 25, 100, 500, 1000];
+    const levSec = this.section(inner, 'レバレッジ');
+    levSec.querySelector('h3')!.append(h('span', 'badge', 'FX式のみ'));
     this.chips(
-      this.section(inner, 'レバレッジ'),
+      levSec,
       'leverage',
       lev.map((v) => ({ v, label: `${v}倍`, badge: v === 25 ? '日本の上限' : v >= 500 ? '海外業者風・超危険' : undefined, danger: v >= 500 })),
     );
@@ -181,7 +194,7 @@ export class TitleScreen {
       h(
         'p',
         'foot',
-        'このゲームは，決めた時間で自動判定する「ハイ＆ロー（バイナリーオプション）」の遊び方に，値幅しだいで損益が変わる FX 式の計算（レバレッジ・スプレッド・ロスカット）を組み合わせたものです．本物の FX は決済のタイミングを自分で決め，本物のバイナリーオプションは当たると決まった額が払い戻されます．',
+        'ゲームの遊び方は，決めた時間で自動判定する「ハイ＆ロー」です．「FX式」は値幅しだいで損益が変わる計算（レバレッジ・スプレッド・ロスカット），「ハイロー」は本物のバイナリーオプションのように当たれば賭け金の1.85倍が払い戻され，外れたら賭け金を全額失う計算です．本物の FX は決済のタイミングを自分で決めます．',
       ),
     );
   }

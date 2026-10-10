@@ -96,13 +96,16 @@ export class Effects {
 
   // ---------- 決済ポップアップ ----------
 
-  popup(x: number, y: number, pnl: number, margin: number): HTMLElement {
+  popup(x: number, y: number, pnl: number, margin: number, bin = false): HTMLElement {
     const sub = `${yen(margin)}円 → ${yen(margin + pnl)}円`;
     const win = pnl > 0;
+    const draw = bin && Math.abs(pnl) < 1e-9;
     const ratio = clamp(Math.abs(pnl) / margin, 0, 2);
-    const size = win ? 22 + ratio * 30 : 18 + ratio * 14;
-    const e = h('div', 'fx-pop ' + (win ? 'win' : 'lose'));
-    e.append(h('div', 'pop-main', win ? `${yen(pnl, true)}円!!` : `${yen(pnl)}円`), h('div', 'pop-sub', sub));
+    const size = win ? 22 + ratio * 30 : bin ? 26 + ratio * 8 : 18 + ratio * 14;
+    const e = h('div', 'fx-pop ' + (win ? 'win' : draw ? 'draw' : bin ? 'lose bin' : 'lose'));
+    const main = draw ? '引き分け（返金）' : win ? `${yen(pnl, true)}円!!` : bin ? `${yen(pnl)}円 没収!!` : `${yen(pnl)}円`;
+    e.append(h('div', 'pop-main', main));
+    if (!(bin && !win && !draw)) e.append(h('div', 'pop-sub', draw ? `${yen(margin)}円 そのまま戻る` : sub));
     e.style.left = clamp(x, 70, window.innerWidth - 70) + 'px';
     e.style.top = clamp(y, 40, window.innerHeight - 40) + 'px';
     e.style.setProperty('--s', size + 'px');
@@ -115,6 +118,37 @@ export class Effects {
     }, 1500);
     if (win && this.level() >= 1) this.particles.sparks(x, y, 6 + Math.round(ratio * 10), '#ffd23f');
     return e;
+  }
+
+  /** ハイローのハズレ：コインがチャリンと散って消える＋軽い揺れ */
+  coinScatter(x: number, y: number) {
+    const lv = this.level();
+    if (lv < 1) return;
+    this.shake(lv >= 2 ? 6 : 3, 320);
+    const n = lv >= 2 ? 7 : 4;
+    for (let i = 0; i < n; i++) {
+      if (this.layer.querySelectorAll('.fx-coin').length > 24) return;
+      const c = h('div', 'fx-coin', '¥');
+      c.style.left = x + 'px';
+      c.style.top = y + 'px';
+      this.layer.appendChild(c);
+      const dx = (Math.random() - 0.5) * 220;
+      const up = -(40 + Math.random() * 60);
+      const down = 90 + Math.random() * 80;
+      try {
+        const a = c.animate(
+          [
+            { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+            { transform: `translate(calc(-50% + ${dx * 0.6}px), calc(-50% + ${up}px)) scale(1)`, opacity: 1, offset: 0.35 },
+            { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${down}px)) scale(0.6) rotate(${dx}deg)`, opacity: 0 },
+          ],
+          { duration: 800 + i * 40, easing: 'ease-in' },
+        );
+        a.onfinish = () => c.remove();
+      } catch {
+        c.remove();
+      }
+    }
   }
 
   /** 短時間に決済が重なったときの小ポップアップ「＋4件 合計 +1,200円」．返した要素の textContent 更新で件数を増やせる */

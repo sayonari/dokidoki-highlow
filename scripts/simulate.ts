@@ -1,17 +1,18 @@
 /**
  * モードごとの値動き生成を検証するシミュレーション．
- *   npx tsx scripts/simulate.ts [ラウンド数=1000] [出力JSON]
+ *   npx tsx scripts/simulate.ts [ラウンド数=1000] [出力JSON] [ルール fx|binary|martingale]
  * 「必ず負け越し／必ず勝ち越し」は，各決済の直後に不変条件を毎回チェックし，違反を数える．
  */
 import { writeFileSync } from 'node:fs';
-import { Engine, type Dir } from '../src/engine/engine';
+import { Engine, type Dir, type Rule } from '../src/engine/engine';
 import { modeDef, type ModeId } from '../src/engine/modes';
 import { Rng } from '../src/engine/rng';
 import { SyntheticSource } from '../src/market/synthetic';
 import { ReplaySource, type ReplayData } from '../src/market/replay';
 
 const ROUNDS = Number(process.argv[2] ?? 1000);
-const OUT = process.argv[3];
+const OUT = process.argv[3] || undefined;
+const RULE = (process.argv[4] ?? 'fx') as Rule;
 
 type Bot = { name: string; rate: number; decide: (hist: number[], rng: Rng, n: number) => Dir };
 const sgn = (v: number): Dir => (v >= 0 ? 1 : -1);
@@ -67,6 +68,7 @@ function runRound(mode: ModeId, bot: Bot, seed: number, agg: Agg) {
     holdMs: rng.pick(HOLDS),
     roundMs: rng.pick(ROUNDS_MS),
     initialCash: 100000,
+    rule: RULE,
   };
   const src =
     mode === 'replay'
@@ -124,5 +126,5 @@ for (const mode of MODE_IDS) {
     );
   }
 }
-console.log(`elapsed ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+console.log(`rule=${RULE} elapsed ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 if (OUT) writeFileSync(OUT, JSON.stringify({ rounds: ROUNDS, date: new Date().toISOString(), results }, null, 1));

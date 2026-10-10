@@ -241,7 +241,9 @@ export class Chart {
         ctx.arc(xs, y, 4, 0, 6.283);
         ctx.fill();
         if (!bundled) {
-          tags.push({ y, label: `${p.dir > 0 ? '▲' : '▼'}${bigYen(p.margin)} ${yen(pnl, true)}円`, gain: profit, ord: p.id });
+          const head = `${p.dir > 0 ? '▲' : '▼'}${bigYen(p.margin)}`;
+          const state = e.isBinary ? (pnl > 0 ? ' 当たり中' : pnl < 0 ? ' ハズレ中' : ' 同値') : '';
+          tags.push({ y, label: `${head}${state} ${yen(pnl, true)}円`, gain: profit, ord: p.id });
           this.ring(ctx, plotW, placed, y, p.dir, Math.max(0, Math.min(1, (p.dueT - e.t) / e.cfg.holdMs)), col, profit);
         }
       }

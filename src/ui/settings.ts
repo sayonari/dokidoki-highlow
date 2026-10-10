@@ -1,9 +1,11 @@
+import type { Rule } from '../engine/engine';
 import type { ModeId } from '../engine/modes';
 
 export type FxLevel = 0 | 1 | 2; // 0=控えめ 1=ふつう 2=ド派手
 
 export interface Settings {
   mode: ModeId;
+  rule: Rule; // 最後に遊んだ決済ルール
   leverage: number;
   margin: number;
   holdSec: number;
@@ -22,6 +24,7 @@ export function defaultSettings(): Settings {
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   return {
     mode: 'realistic',
+    rule: 'fx',
     leverage: 100,
     margin: 10000,
     holdSec: 5,

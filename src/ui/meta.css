@@ -38,3 +38,43 @@
 /* 結果が長くなったのでスクロールできるように */
 .result { height: 100dvh; overflow-x: hidden; overflow-y: auto; }
 .result .halo { position: fixed; }
+
+/* ---- スタートボタン（3ルール） ---- */
+.start-group { display: grid; gap: 12px; width: min(100%, 460px); margin: 22px auto 8px; }
+.start-group .start-btn { margin: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 16px; font-size: clamp(18px, 5.2vw, 26px); line-height: 1.2; }
+.start-group .start-btn.fx { padding: 20px 16px; font-size: clamp(24px, 7.4vw, 36px); }
+.start-sub { font-size: clamp(12px, 3.4vw, 15px); font-weight: 800; opacity: 0.85; line-height: 1.3; }
+.start-btn.hilo { color: #fff; border-color: #ffc2da; background: linear-gradient(180deg, #ff7ab5, #e0206f); box-shadow: 0 0 24px rgba(255, 59, 141, 0.7), 0 6px 0 #8d0a4a; animation: none; }
+.start-btn.hilo:active { box-shadow: 0 0 16px rgba(255, 59, 141, 0.7), 0 2px 0 #8d0a4a; }
+.start-btn.mg { color: #fff; border-color: #e6c2ff; background: linear-gradient(180deg, #c05cff, #7a0fa8 60%, #b0123a); box-shadow: 0 0 24px rgba(180, 60, 220, 0.7), 0 6px 0 #4a0a6a; animation: none; }
+.start-btn.mg:active { box-shadow: 0 0 16px rgba(180, 60, 220, 0.7), 0 2px 0 #4a0a6a; }
+.start-btn.hilo::after, .start-btn.mg::after { display: none; }
+.set h3 .badge { background: var(--gold); }
+
+/* ---- ハイロー系のプレイ画面 ---- */
+.hilo-info { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14px; margin: 2px 0 4px; color: var(--dim); }
+.hilo-info .hi-main { color: var(--pink); }
+.hilo-info.mg { border: 1px solid #b0123a; border-radius: 10px; padding: 2px 8px; background: rgba(176, 18, 58, 0.12); }
+.hi-steps { display: flex; align-items: baseline; gap: 4px; }
+.hi-step { opacity: 0.55; font-size: 14px; }
+.hi-step.cur { opacity: 1; color: #fff; font-size: clamp(22px, 6vw, 30px); line-height: 1; text-shadow: 0 0 12px #ff3b5c; }
+.hi-step.cur.hot { color: #ff5a6a; animation: blink 0.6s steps(2) infinite; }
+.btn-bet.bin { font-size: clamp(13px, 3.6vw, 19px); white-space: pre-line; text-align: center; line-height: 1.2; }
+.btn-mg { font-size: clamp(12px, 3.4vw, 15px); font-weight: 900; color: #fff; background: rgba(176, 18, 58, 0.85); border-radius: 999px; padding: 1px 10px; white-space: nowrap; animation: mgPulse 0.7s ease-in-out infinite alternate; text-shadow: none; }
+@keyframes mgPulse { from { box-shadow: 0 0 0 rgba(255, 60, 90, 0); filter: brightness(1); } to { box-shadow: 0 0 14px rgba(255, 60, 90, 0.95); filter: brightness(1.4); } }
+.fx-pop.lose.bin .pop-main { color: #ff6a85; -webkit-text-stroke: 2px #4a0010; paint-order: stroke fill; text-shadow: 0 0 14px #c4112f, 0 0 26px rgba(255, 59, 92, 0.7); }
+.fx-pop.lose.bin { animation: popLoseBin 1.5s ease-in forwards; }
+.fx-pop.draw .pop-main { color: var(--cyan); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
+.fx-pop.draw { animation: popLose 1.2s ease-in forwards; }
+@keyframes popLoseBin {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  12% { transform: translate(-50%, -50%) scale(1.25) rotate(-3deg); opacity: 1; }
+  22% { transform: translate(-46%, -50%) scale(1.15) rotate(3deg); }
+  32% { transform: translate(-54%, -50%) scale(1.15) rotate(-2deg); }
+  45% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, 30%) scale(0.9); opacity: 0; }
+}
+
+/* ---- 結果画面（ルール） ---- */
+.res-rule { display: inline-block; justify-self: center; font-size: clamp(14px, 4vw, 17px); color: #fff; background: rgba(255, 255, 255, 0.12); border: 1px solid var(--line); border-radius: 999px; padding: 2px 14px; }
+.review-note { font-size: 11px; color: var(--dim); font-weight: 700; }

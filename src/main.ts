@@ -21,6 +21,7 @@ import { h } from './ui/util';
 const app = document.getElementById('app')!;
 const ALT = HAS_REPLAY ? '『実データ再生』' : '『リアルっぽい』相場';
 const settings = loadSettings();
+if (!['fx', 'binary', 'martingale'].includes(settings.rule)) settings.rule = 'fx';
 if (!MODES.some((m) => m.id === settings.mode) || (settings.mode === 'replay' && !HAS_REPLAY)) settings.mode = 'realistic';
 
 type Current = { dispose(): void } | null;
@@ -71,6 +72,7 @@ async function build(s: Settings): Promise<{ engine: Engine; source: PriceSource
     holdMs: s.holdSec * 1000,
     roundMs: s.roundSec * 1000,
     initialCash: 100000,
+    rule: s.rule,
   };
   return { engine: new Engine(cfg, source, rng), source, cfg, secret };
 }
@@ -143,6 +145,11 @@ function showResult(res: GameResult, s: Settings) {
       (lev) => {
         // 倍率だけ変えて，他の設定そのままで即スタート
         settings.leverage = lev;
+        void launch(settings);
+      },
+      (rule) => {
+        // ルールだけ変えて，相場モード・他の設定そのままで即スタート
+        settings.rule = rule;
         void launch(settings);
       },
     ),

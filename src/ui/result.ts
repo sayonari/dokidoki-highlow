@@ -6,12 +6,15 @@ import type { GameResult } from './game';
 import type { Settings } from './settings';
 import { recheckAchievements, recordRound } from './records';
 import type { Achievement, Ctx, Update } from './records';
-import { h, sleep, yen } from './util';
+import type { Rule } from '../engine/engine';
+import { RULE_NAMES, h, sleep, yen } from './util';
 
 export function educationalNote(r: GameResult): string {
   const e = r.engine;
   const id = r.cfg.mode.id;
   const L = r.cfg.leverage;
+  if (e.rule === 'martingale') return `倍賭けは連敗すると 1万→2万→4万→8万…と賭け金が一気にふくらみ，すぐに払えなくなります（今回の最大の賭け金：${yen(e.maxStake)}円）`;
+  if (e.rule === 'binary') return '払い戻し1.85倍のハイローは，勝率54%以上でないと平均でお金が減ります．数秒後の上下はほぼ五分五分なので，続けるほど減っていきます';
   if (id === 'mustwin') return '「必ず勝ち越し」は現実には存在しません．「絶対もうかる」と言われたら詐欺を疑おう';
   if (id === 'mustlose') return '「必ず負け越し」は胴元が値動きを操作した場合の姿．取引相手が信頼できるかはとても大事';
   if (e.losscuts > 0) return 'ロスカットは損が大きくなりすぎる前に強制的に決済するしくみ．でも値が急に飛ぶと間に合わないことも．このゲームではマイナス分を0円で止めています（ゼロカット）';
@@ -29,9 +32,11 @@ export function educationalNote(r: GameResult): string {
 export function titleOf(r: GameResult): string {
   const e = r.engine;
   const id = r.cfg.mode.id;
-  const L = r.cfg.leverage;
+  const bin = e.isBinary;
+  const L = bin ? 100 : r.cfg.leverage; // ハイローにレバレッジは無関係
   const pnl = e.realized;
   const taps = Math.max(e.shots, r.log.taps.up + r.log.taps.down);
+  if (e.rule === 'martingale' && e.endReason === 'bankrupt') return '倍賭けの犠牲者';
   if (id === 'mustwin') return '相場の神に愛されし者';
   if (id === 'mustlose') return '胴元のお得意さま';
   if (pnl >= r.cfg.initialCash * 0.5) return '爆益の申し子';
@@ -42,6 +47,7 @@ export function titleOf(r: GameResult): string {
   if (pnl > 0 && L <= 25) return '堅実トレーダー';
   if (pnl > 0) return 'ドキドキの勝者';
   if (id === 'random') return 'コイン投げの旅人';
+  if (bin && pnl < 0) return '胴元のお得意さま';
   if (pnl < 0 && pnl > -10000) return 'かすり傷の冒険家';
   if (pnl < 0 && L >= 500) return 'ハラハラの冒険家';
   return '見習いトレーダー';
@@ -49,7 +55,7 @@ export function titleOf(r: GameResult): string {
 
 export function copyText(r: GameResult): string {
   const e = r.engine;
-  return `ドキドキハイ＆ロー 結果：${yen(e.realized, true)}円（${e.wins}勝${e.losses}敗）称号『${titleOf(r)}』 #ドキドキハイアンドロー`;
+  return `ドキドキハイ＆ロー［${RULE_NAMES[e.rule]}］結果：${yen(e.realized, true)}円（${e.wins}勝${e.losses}敗）称号『${titleOf(r)}』 #ドキドキハイアンドロー`;
 }
 
 export class ResultScreen {
@@ -70,6 +76,7 @@ export class ResultScreen {
     private readonly onRetry: () => void,
     private readonly onTitle: () => void,
     private readonly onRetryLev: (lev: number) => void = () => onRetry(),
+    private readonly onRetryRule: (rule: Rule) => void = () => onRetry(),
   ) {
     this.root = h('div', 'screen result');
     this.popHost = h('div', 'ach-pop-host');
@@ -104,6 +111,7 @@ export class ResultScreen {
     const card = h('div', 'card');
     if (newBest) card.append(h('div', 'best-band', '🏅 自己ベスト更新!! 🏅'));
     card.append(h('div', 'verdict ' + (plus ? 'win' : minus ? 'lose' : ''), plus ? 'プラスで終了!!' : minus ? 'マイナスで終了…' : '±0'));
+    card.append(h('div', 'res-rule', RULE_NAMES[e.rule]));
     card.append(h('div', 'res-title', `称号『${title}』`));
 
     const bal = h('div', 'res-balance');
@@ -118,7 +126,7 @@ export class ResultScreen {
     const total = e.wins + e.losses;
     const rate = total ? Math.round((e.wins / total) * 100) : 0;
     const wl = h('div', 'res-wl');
-    wl.append(h('div', 'res-wl-main', `勝ち${e.wins}回・負け${e.losses}回（勝率${rate}%）`), h('div', 'res-wl-note', 'ロスカットはまとめて1敗と数えます'));
+    wl.append(h('div', 'res-wl-main', `勝ち${e.wins}回・負け${e.losses}回（勝率${rate}%）`), h('div', 'res-wl-note', e.isBinary ? '引き分け（同値）は返金で，勝ちにも負けにも数えません' : 'ロスカットはまとめて1敗と数えます'));
     card.append(wl);
 
     // 自己ベスト
@@ -142,7 +150,8 @@ export class ResultScreen {
     };
     cell('引き分け', String(e.draws));
     cell('最大連勝', String(e.maxWinStreak));
-    cell('ロスカット', e.losscuts + '回');
+    if (e.isBinary) cell(e.rule === 'martingale' ? '最大の賭け金' : '払い戻し', e.rule === 'martingale' ? yen(e.maxStake) + '円' : `${e.payout}倍`);
+    else cell('ロスカット', e.losscuts + '回');
     cell('発注数', String(e.shots));
     card.append(grid);
 
@@ -223,7 +232,21 @@ export class ResultScreen {
       sfx.click('down');
       this.onTitle();
     };
-    btns.append(retry, lvRow, copy, copyOut, back);
+    const ruleRow = h('div', 'lev-retry');
+    ruleRow.append(h('span', 'lev-retry-label', 'ほかのルールで遊ぶ：'));
+    for (const rl of ['fx', 'binary', 'martingale'] as Rule[]) {
+      if (rl === e.rule) continue;
+      const c = h('button', 'chip', RULE_NAMES[rl]);
+      c.type = 'button';
+      c.onclick = () => {
+        sfx.click('up');
+        this.onRetryRule(rl);
+      };
+      ruleRow.append(c);
+    }
+    btns.append(retry);
+    if (!e.isBinary) btns.append(lvRow);
+    btns.append(ruleRow, copy, copyOut, back);
     card.append(btns);
     this.root.append(card, this.popHost);
 
@@ -254,13 +277,24 @@ export class ResultScreen {
     const box = h('div', 'review');
     box.append(h('div', 'review-title', '🔍 今回の振り返り'));
     const li = (t: string, cls = '') => box.append(h('div', 'review-item ' + cls, t));
-    li(`今回のコスト（スプレッド＝売値と買値の差）：${yen(log.spreadCost)}円`);
+    if (e.isBinary) {
+      const winSum = log.settles.filter((v) => v > 0).reduce((a, b) => a + b, 0);
+      const k = e.payout - 1;
+      li(`もし払い戻しがちょうど2倍（胴元の取り分なし）なら，損益は約${yen(pnl + (winSum / k) * (2 - e.payout), true)}円`);
+      const total = e.wins + e.losses;
+      li(`トントンに必要な勝率：${(100 / e.payout).toFixed(1)}%（1÷${e.payout}）／今回の勝率：${total ? Math.round((e.wins / total) * 100) : 0}%`);
+      if (e.rule === 'martingale') {
+        li(`最大の賭け金：${yen(e.maxStake)}円（倍賭け${Math.round(Math.log2(e.maxStake / cfg.marginPerShot))}段）`, 'hl');
+        li('払い戻し1.85倍のハイローは，勝率54%以上でないと平均でお金が減ります．数秒後の上下はほぼ五分五分なので，続けるほど減っていきます');
+      }
+    } else li(`今回のコスト（スプレッド＝売値と買値の差）：${yen(log.spreadCost)}円`);
     if (e.wins > e.losses && pnl < 0) li('勝った回数は多いのにお金は減った！ 負けた時の額が大きかったから', 'hl');
     else if (e.losses > e.wins && pnl > 0) li('負けた回数は多いのにプラス！ 1回の勝ちが大きかった', 'hl');
-    if (cfg.leverage !== 25) li(`もし日本の上限の25倍だったら，損益は約${yen((pnl * 25) / cfg.leverage, true)}円（ロスカットが無かったとして）`);
+    if (!e.isBinary && cfg.leverage !== 25) li(`もし日本の上限の25倍だったら，損益は約${yen((pnl * 25) / cfg.leverage, true)}円（ロスカットが無かったとして）`);
     if (log.biggestWin > 0) li(`最大の勝ち：${yen(log.biggestWin, true)}円`);
     if (log.biggestLoss < 0) li(`最大の負け：${yen(log.biggestLoss, true)}円`);
     if (e.zeroCutTotal > 0) li(`ゼロカット：${yen(e.zeroCutTotal)}円分は0円で止まりました`, 'hl');
+    if (e.isBinary) box.append(h('div', 'review-note', '日本の登録業者の個人向けバイナリーオプションは，判定まで2時間以上などのルールで規制されています'));
     return box;
   }
 

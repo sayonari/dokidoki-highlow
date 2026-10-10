@@ -6,7 +6,7 @@ import { sfx } from '../audio/sfx';
 import { Effects } from '../fx/effects';
 import { Chart } from './chart';
 import { saveSettings, type FxLevel, type Settings } from './settings';
-import { bigYen, clamp, h, sleep, yen } from './util';
+import { RULE_NAMES, bigYen, clamp, h, sleep, yen } from './util';
 
 export interface GameResult {
   engine: Engine;
@@ -44,6 +44,8 @@ export class Game {
   private readonly chart: Chart;
   private readonly e: Engine;
   private readonly cfg: GameConfig;
+  /** ハイロー系（本物・倍賭け）か */
+  private readonly bin: boolean;
 
   private raf = 0;
   private lastNow = 0;
@@ -90,6 +92,10 @@ export class Game {
   private elBar!: HTMLElement;
   private elBarText!: HTMLElement;
   private mbar!: HTMLElement;
+  private hiloInfo!: HTMLElement;
+  private mgSteps: HTMLElement[] = [];
+  private bets = new Map<Dir, HTMLElement>();
+  private mgTags = new Map<Dir, HTMLElement>();
   private btnUp!: HTMLButtonElement;
   private btnDown!: HTMLButtonElement;
   private badges = new Map<Dir, HTMLElement>();
@@ -99,6 +105,7 @@ export class Game {
   constructor(parent: HTMLElement, private readonly o: GameOpts) {
     this.e = o.engine;
     this.cfg = o.cfg;
+    this.bin = o.engine.isBinary;
     this.dispEq = this.cfg.initialCash;
     this.root = h('div', 'game-root');
     this.stage = h('div', 'play');
@@ -136,7 +143,7 @@ export class Game {
     const eqBox = h('div', 'eq-box');
     this.elEq = h('div', 'eq-val', '');
     const lab = h('div', 'eq-label');
-    lab.append('いまのお金 ', h('span', 'eq-sub', '（有効証拠金）'));
+    lab.append('いまのお金 ', h('span', 'eq-sub', this.bin ? '（いま判定したら）' : '（有効証拠金）'));
     eqBox.append(lab, this.elEq);
     const timeBox = h('div', 'time-box');
     this.elTime = h('div', 'time-val', '');
@@ -166,7 +173,7 @@ export class Game {
     this.elMeter.append(dots);
     this.elFever = h('div', 'meter-fever hidden');
     this.elMeter.append(this.elFever);
-    const md = h('span', 'meter-mode', this.o.secret ? '🎁 ？？？' : `${this.cfg.mode.icon} ${this.cfg.mode.name}`);
+    const md = h('span', 'meter-mode', `${RULE_NAMES[this.e.rule]}｜${this.o.secret ? '🎁 ？？？' : `${this.cfg.mode.icon} ${this.cfg.mode.name}`}`);
     this.elMeter.append(md);
 
     this.mbar = h('div', 'mbar');
@@ -175,6 +182,24 @@ export class Game {
     track.append(this.elBar);
     this.elBarText = h('div', 'mbar-text', '');
     this.mbar.append(h('div', 'mbar-label', 'ロスカットまでの余裕'), track, this.elBarText);
+    this.mbar.classList.toggle('hidden', this.bin);
+
+    // ハイロー系：ロスカットの代わりに払い戻し／倍賭けの段数
+    this.hiloInfo = h('div', 'hilo-info' + (this.e.rule === 'martingale' ? ' mg' : ''));
+    const needPct = Math.round(100 / this.e.payout);
+    if (this.e.rule === 'martingale') {
+      this.hiloInfo.append(h('span', '', '倍賭け'));
+      const steps = h('div', 'hi-steps');
+      for (let i = 0; i < 5; i++) {
+        const s = h('span', 'hi-step', `×${2 ** i}`);
+        this.mgSteps.push(s);
+        steps.append(s, h('span', 'hi-arrow', i < 4 ? '→' : '…'));
+      }
+      this.hiloInfo.append(steps, h('span', '', `払い戻し${this.e.payout}倍`));
+    } else {
+      this.hiloInfo.append(h('span', 'hi-main', `払い戻し ${this.e.payout}倍`), h('span', '', `｜勝率${needPct}%以上でトントン`));
+    }
+    this.hiloInfo.classList.toggle('hidden', !this.bin);
 
     const wrap = h('div', 'chart-wrap');
     this.canvas = h('canvas', 'chart');
@@ -187,7 +212,7 @@ export class Game {
 
     this.btnsBox = btns;
     this.wrapBox = wrap;
-    this.stage.append(tools, hud, stats, this.elMeter, this.mbar, wrap, btns);
+    this.stage.append(tools, hud, stats, this.elMeter, this.mbar, this.hiloInfo, wrap, btns);
     this.stage.addEventListener('contextmenu', (ev) => ev.preventDefault());
   }
 
@@ -198,13 +223,19 @@ export class Game {
     head.append(h('span', 'btn-arrow', dir > 0 ? '▲' : '▼'), h('span', 'btn-text', dir > 0 ? '上がる' : '下がる'));
     const lev = this.cfg.leverage;
     const note = `×${lev}倍＝約${bigYen(this.cfg.marginPerShot * lev)}分の取引`;
+    const bet = h('span', 'btn-bet' + (this.bin ? ' bin' : ''), `1回 ${yen(this.cfg.marginPerShot)}円`);
+    const mgTag = h('span', 'btn-mg hidden');
+    this.bets.set(dir, bet);
+    this.mgTags.set(dir, mgTag);
     const badge = h('span', 'btn-badge hidden');
     const short = h('span', 'btn-short hidden', 'お金が足りない');
     const can = h('span', 'btn-can hidden');
     this.cans.set(dir, can);
     this.badges.set(dir, badge);
     this.shorts.set(dir, short);
-    b.append(head, h('span', 'btn-bet', `1回 ${yen(this.cfg.marginPerShot)}円`), can, h('span', 'btn-note', note), badge, short);
+    b.append(head, bet, mgTag, can);
+    if (!this.bin) b.append(h('span', 'btn-note', note));
+    b.append(badge, short);
     b.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       this.ripple(b, ev.clientX, ev.clientY);
@@ -354,9 +385,9 @@ export class Game {
   private tutAdvance(from: number) {
     if (this.tutStep !== from) return;
     if (from === 1) {
-      this.tutShow(2, `${this.cfg.holdMs / 1000}秒たつと自動で決済されるよ．チャートの丸い時計を見てね`);
+      this.tutShow(2, this.bin ? `${this.cfg.holdMs / 1000}秒後に判定されるよ．チャートの丸い時計を見てね` : `${this.cfg.holdMs / 1000}秒たつと自動で決済されるよ．チャートの丸い時計を見てね`);
     } else if (from === 2) {
-      this.tutShow(3, '勝つとお金が増える！何回でも押せるよ');
+      this.tutShow(3, this.bin ? `当たると賭け金の${this.e.payout}倍が戻るよ！何回でも押せるよ` : '勝つとお金が増える！何回でも押せるよ');
       this.tutTimer = window.setTimeout(() => {
         this.tutEl?.remove();
         this.tutEl = null;
@@ -426,12 +457,12 @@ export class Game {
       const cr = this.canvas.getBoundingClientRect();
       const tip = this.chart.tip(this.e.mid);
       // 発注は支出ではなく「拘束」：決済で戻ってくる
-      this.fx.chip(br.left + br.width / 2, br.top + 14, cr.left + tip.x, cr.top + tip.y, dir > 0, `取引中 ${bigYen(this.cfg.marginPerShot)}`);
+      this.fx.chip(br.left + br.width / 2, br.top + 14, cr.left + tip.x, cr.top + tip.y, dir > 0, `${this.bin ? '賭け中' : '取引中'} ${bigYen(ev.pos.margin)}`);
       this.bump(this.elUsed);
       this.vib(10);
       if (dir > 0) this.log.taps.up++;
       else this.log.taps.down++;
-      this.log.spreadCost += (ev.pos.units * ev.pos.entrySpread) / 2 / 1000;
+      if (!this.bin) this.log.spreadCost += (ev.pos.units * ev.pos.entrySpread) / 2 / 1000;
       this.log.maxOpen = Math.max(this.log.maxOpen, this.e.positions.length);
       this.tutAdvance(1);
     } else if (ev.k === 'reject' && ev.reason === 'margin') {
@@ -456,7 +487,7 @@ export class Game {
   }
 
   /** 決済ポップアップ．300ms 以内に4件以上重なったら「＋4件 合計 …」にまとめる */
-  private settlePopup(x: number, y: number, pnl: number) {
+  private settlePopup(x: number, y: number, pnl: number, margin: number) {
     const w = this.pw;
     const now = performance.now();
     if (now - w.start > 300) {
@@ -469,7 +500,7 @@ export class Game {
     w.n++;
     w.sum += pnl;
     if (w.n <= 3) {
-      w.els.push(this.fx.popup(x, y, pnl, this.cfg.marginPerShot));
+      w.els.push(this.fx.popup(x, y, pnl, margin, this.bin));
     } else if (!w.batch) {
       this.fx.removePopups(w.els);
       w.els = [];
@@ -488,7 +519,7 @@ export class Game {
     for (const ev of evs) {
       if (ev.k === 'settle') {
         settled.add(ev.pos.id);
-        log.spreadCost += (ev.pos.units * this.e.spread) / 2 / 1000;
+        if (!this.bin) log.spreadCost += (ev.pos.units * this.e.spread) / 2 / 1000;
         log.settles.push(ev.pnl);
         log.biggestWin = Math.max(log.biggestWin, ev.pnl);
         log.biggestLoss = Math.min(log.biggestLoss, ev.pnl);
@@ -496,9 +527,10 @@ export class Game {
         const tip = this.chart.tip(ev.exitMid);
         const x = cr.left + tip.x - 30;
         const y = cr.top + clamp(tip.y, 30, cr.height - 30) - 20;
-        this.settlePopup(x, y, ev.pnl);
+        this.settlePopup(x, y, ev.pnl, ev.pos.margin);
         const strength = Math.min(1, Math.abs(ev.pnl) / m);
-        const big = Math.abs(ev.pnl) >= m * 0.5;
+        // ハイローは毎回「証拠金の半分以上」になるので，賭け金が1発の4倍以上のときだけ大きい扱い
+        const big = this.bin ? ev.pos.margin >= m * 4 : Math.abs(ev.pnl) >= m * 0.5;
         if (ev.outcome === 'win') {
           sfx.settleWin(strength);
           const s = ev.streak;
@@ -549,6 +581,7 @@ export class Game {
           this.fx.lose(big);
           // 割れる札には賭け金ではなく実際の損益を出す
           this.fx.chipBreak(cr.left + tip.x, cr.top + tip.y, `${yen(ev.pnl)}円`);
+          if (this.bin) this.fx.coinScatter(cr.left + tip.x, cr.top + tip.y);
           this.streakStopped();
         }
       } else if (ev.k === 'losscut') {
@@ -587,7 +620,13 @@ export class Game {
     if (reason === 'bankrupt') {
       // 破産ではなく「次の1回分が足りない」ことを伝える
       const broke = this.e.balance < this.cfg.marginPerShot * 0.05;
-      this.fx.headline('終了…', 'sad', broke ? 'お金がなくなりました…' : `次の1回分（${bigYen(this.cfg.marginPerShot)}）のお金が足りないので終了`);
+      const msg =
+        this.e.rule === 'martingale'
+          ? `次の賭け金 ${yen(this.e.nextStake())}円 が払えない！ 倍賭けストップ…`
+          : this.bin || broke
+            ? 'お金がなくなりました…'
+            : `次の1回分（${bigYen(this.cfg.marginPerShot)}）のお金が足りないので終了`;
+      this.fx.headline('終了…', 'sad', msg);
     } else {
       this.fx.headline('終了〜!!');
     }
@@ -699,7 +738,8 @@ export class Game {
     // ボタンのバッジ・「いま○回押せる」・待つ理由
     const accepting = e.acceptingOrders;
     const afford = e.canAfford();
-    const can = accepting ? Math.floor((e.freeMargin() + 1e-6) / this.cfg.marginPerShot) : 0;
+    const stake = e.nextStake();
+    const can = accepting ? Math.floor(((this.bin ? e.balance - used : e.freeMargin()) + 1e-6) / stake) : 0;
     let shortText = '';
     if (!accepting) shortText = '時間切れ・決済待ち';
     else if (!afford) shortText = e.positions.length ? `決済待ち… あと${this.waitSec()}秒` : 'お金が足りない';
@@ -708,7 +748,16 @@ export class Game {
       for (const p of e.positions) if (p.dir === dir) n++;
       const badge = this.badges.get(dir)!;
       badge.classList.toggle('hidden', n === 0);
-      this.setText(badge, 'badge' + dir, `かけ中 ${n}回・${yen(n * this.cfg.marginPerShot)}円`);
+      let sum = 0;
+      for (const p of e.positions) if (p.dir === dir) sum += p.margin;
+      this.setText(badge, 'badge' + dir, `かけ中 ${n}回・${yen(sum)}円`);
+      if (this.bin) {
+        const bet = this.bets.get(dir)!;
+        this.setText(bet, 'bet' + dir, this.e.rule === 'martingale' ? `次の賭け金 ${yen(stake)}円` : `1回 ${yen(stake)}円\n→ 当たれば ${yen(stake * e.payout)}円`);
+        const mg = this.mgTags.get(dir)!;
+        mg.classList.toggle('hidden', !(e.rule === 'martingale' && e.mgLevel >= 1));
+        this.setText(mg, 'mg' + dir, `${e.mgLevel}連敗 → 倍賭け中！`);
+      }
       const short = this.shorts.get(dir)!;
       short.classList.toggle('hidden', !shortText);
       this.setText(short, 'short' + dir, shortText);
@@ -737,6 +786,17 @@ export class Game {
       sfx.tick();
     }
 
+    if (this.bin) {
+      if (e.rule === 'martingale') {
+        const cur = Math.min(4, e.mgLevel);
+        this.mgSteps.forEach((s, i) => {
+          s.classList.toggle('cur', i === cur);
+          s.classList.toggle('hot', i === cur && e.mgLevel >= 1);
+          this.setText(s, 'mgs' + i, `×${2 ** (i === cur ? e.mgLevel : i)}`);
+        });
+      }
+      return;
+    }
     // ロスカットまでの余裕（維持率 50%→0，300%→満タン）
     if (used > 0) {
       const ratio = eq / used;

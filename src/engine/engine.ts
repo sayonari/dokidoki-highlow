@@ -10,7 +10,17 @@ export interface GameConfig {
   holdMs: number; // 建ててから自動決済までの時間
   roundMs: number; // ラウンドの長さ
   initialCash: number;
+  /**
+   * 決済ルール．fx = 値幅×数量で損益（FX式，既定），binary = ハイロー（当たれば賭け金×payout，外れたら賭け金を全額失う），
+   * martingale = binary ＋ 倍賭け（負けたら次の賭け金を2倍，勝ったら元に戻す）
+   */
+  rule?: Rule;
+  /** ハイローの払い戻し倍率（既定 1.85） */
+  payout?: number;
 }
+
+export type Rule = 'fx' | 'binary' | 'martingale';
+export const DEFAULT_PAYOUT = 1.85;
 
 export type Dir = 1 | -1;
 export type Outcome = 'win' | 'lose' | 'draw';
@@ -20,8 +30,8 @@ export interface Position {
   dir: Dir;
   entryMid: number; // [pt]
   entrySpread: number; // [pt]
-  units: number; // 数量 [USD]
-  margin: number; // [円]
+  units: number; // 数量 [USD]（ハイローでは賭け金と同じ値を入れ，胴元ドリフトの重みにだけ使う）
+  margin: number; // [円]（ハイローでは賭け金）
   openT: number;
   dueT: number;
 }
@@ -66,6 +76,10 @@ export class Engine {
   forcedSettles = 0;
   /** ゼロカットで免除した額の合計 [円] */
   zeroCutTotal = 0;
+  /** 倍賭けの段数（次の賭け金 = 1発の金額 × 2^mgLevel） */
+  mgLevel = 0;
+  /** このラウンドで最も大きかった賭け金（倍賭けの振り返り用） */
+  maxStake = 0;
   private nextId = 1;
 
   constructor(
@@ -88,12 +102,30 @@ export class Engine {
   get ask(): number {
     return this.mid + this.spread / 2;
   }
+  get rule(): Rule {
+    return this.cfg.rule ?? 'fx';
+  }
+  get isBinary(): boolean {
+    return this.rule !== 'fx';
+  }
+  get payout(): number {
+    return this.cfg.payout ?? DEFAULT_PAYOUT;
+  }
+  /** 次の1発の金額（倍賭けなら段数ぶん2倍ずつ） */
+  nextStake(): number {
+    return this.rule === 'martingale' ? this.cfg.marginPerShot * 2 ** this.mgLevel : this.cfg.marginPerShot;
+  }
   get acceptingOrders(): boolean {
     return !this.finished && this.t < this.cfg.roundMs;
   }
 
   /** 建玉 p を mid=x で決済したときの損益 [円] */
   pnlAt(p: Position, x: number, spreadNow = this.spread): number {
+    if (this.isBinary) {
+      // ハイロー：建値より有利なら賭け金×(倍率−1)の勝ち，不利なら賭け金を全額失う，同値は返金
+      const k = p.dir * (x - p.entryMid);
+      return k > 0 ? p.margin * (this.payout - 1) : k < 0 ? -p.margin : 0;
+    }
     return (p.units * (p.dir * (x - p.entryMid) - (p.entrySpread + spreadNow) / 2)) / PT;
   }
   usedMargin(): number {
@@ -113,6 +145,8 @@ export class Engine {
     return this.equity() - this.usedMargin();
   }
   canAfford(): boolean {
+    // ハイローは賭け金を確定残高から出す（含み損益では賭けられない）
+    if (this.isBinary) return this.balance - this.usedMargin() >= this.nextStake();
     return this.freeMargin() >= this.cfg.marginPerShot;
   }
 
@@ -123,16 +157,19 @@ export class Engine {
     if (!this.canAfford()) return { k: 'reject', reason: 'margin' };
     this.lastOpenTick = tick;
 
-    const s = this.spread;
+    const bin = this.isBinary;
+    const stake = this.nextStake();
+    const s = bin ? 0 : this.spread; // ハイローは中値で判定（胴元の取り分は払い戻し倍率に含まれる）
     const entryPx = this.mid + (dir * s) / 2; // 買いは Ask，売りは Bid
-    const units = (this.cfg.marginPerShot * this.cfg.leverage) / (entryPx / PT);
+    const units = bin ? stake : (stake * this.cfg.leverage) / (entryPx / PT);
+    this.maxStake = Math.max(this.maxStake, stake);
     const pos: Position = {
       id: this.nextId++,
       dir,
       entryMid: this.mid,
       entrySpread: s,
       units,
-      margin: this.cfg.marginPerShot,
+      margin: stake,
       openT: this.t,
       dueT: this.t + this.cfg.holdMs,
     };
@@ -153,7 +190,7 @@ export class Engine {
     let x = this.source.next(dt, steer);
 
     // 2. 「必ず勝ち越し」：ロスカット水準に近づかないよう価格を制限
-    if (dr?.invariant === 'win') x = this.clampToGuard(x, null, MUSTWIN_GUARD_RATIO) ?? x;
+    if (dr?.invariant === 'win' && !this.isBinary) x = this.clampToGuard(x, null, MUSTWIN_GUARD_RATIO) ?? x;
     this.mid = x;
     this.source.set(x);
 
@@ -175,7 +212,7 @@ export class Engine {
     }
 
     // 4. ロスカット判定（「必ず勝ち越し」は仕様上ロスカットを起こさない）
-    if (dr?.invariant !== 'win' && this.positions.length && this.equity() < this.usedMargin() * LOSSCUT_RATIO) {
+    if (!this.isBinary && dr?.invariant !== 'win' && this.positions.length && this.equity() < this.usedMargin() * LOSSCUT_RATIO) {
       ev.push(this.losscut());
     }
 
@@ -235,7 +272,7 @@ export class Engine {
    */
   private directedExit(p: Position): number | null {
     const dr = this.cfg.mode.director!;
-    const s = Math.round((p.entrySpread + this.spread) / 2);
+    const s = this.isBinary ? 0 : Math.round((p.entrySpread + this.spread) / 2);
     const kNow = p.dir * (this.mid - p.entryMid);
     const n = this.wins + this.losses + 1;
     let wantWin: boolean;
@@ -264,12 +301,18 @@ export class Engine {
   private directedExitAs(p: Position, wantWinIn: boolean, guardRatio: number): number | null {
     const dr = this.cfg.mode.director!;
     let wantWin = wantWinIn;
-    const s = Math.round((p.entrySpread + this.spread) / 2);
+    const bin = this.isBinary;
+    const s = bin ? 0 : Math.round((p.entrySpread + this.spread) / 2);
     const perPt = p.units / PT; // 1pt あたりの損益 [円]
     let lo = -Infinity;
     let hi = Infinity;
 
-    if (dr.invariant === 'lose') {
+    if (bin) {
+      // ハイロー：損益は値幅によらず固定なので，勝ち／負けの可否だけを判定する
+      const winPnl = p.margin * (this.payout - 1);
+      if (dr.invariant === 'lose' && !(this.wins + 1 < this.losses && this.realized + winPnl < 0)) wantWin = false;
+      if (dr.invariant === 'win' && !(this.wins > this.losses + 1 && this.realized - p.margin > 0)) wantWin = true;
+    } else if (dr.invariant === 'lose') {
       // 勝ちにできるのは：決済後も 勝ち<負け かつ 累積損益<0 のとき
       const kMax = s + Math.ceil(-this.realized / perPt) - 1; // pnl < −realized
       const winOk = this.wins + 1 < this.losses && this.realized < 0 && kMax >= s + 1;
@@ -302,7 +345,7 @@ export class Engine {
     }
     let x = p.entryMid + p.dir * k;
 
-    if (dr.invariant === 'win' && guardRatio > 0) {
+    if (dr.invariant === 'win' && guardRatio > 0 && !bin) {
       // ロスカット回避の範囲とも両立させる（[lo,hi] を x 空間に写して交差）
       const xa = p.entryMid + p.dir * lo;
       const xb = p.entryMid + p.dir * hi;
@@ -348,6 +391,10 @@ export class Engine {
 
   private record(pnl: number, forced?: Outcome): { outcome: Outcome; streak: number } {
     const outcome: Outcome = forced ?? (pnl > 1e-9 ? 'win' : pnl < -1e-9 ? 'lose' : 'draw');
+    if (this.rule === 'martingale') {
+      if (outcome === 'win') this.mgLevel = 0;
+      else if (outcome === 'lose') this.mgLevel++;
+    }
     if (outcome === 'win') {
       this.wins++;
       this.streak = this.streak > 0 ? this.streak + 1 : 1;

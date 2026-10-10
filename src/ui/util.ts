@@ -1,3 +1,5 @@
+import type { Rule } from '../engine/engine';
+
 /** DOM 要素を作る小さなヘルパー */
 export function h<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -39,3 +41,6 @@ export function bigYen(v: number): string {
   if (r >= 1e4) return f(r / 1e4) + '万円';
   return r.toLocaleString('ja-JP') + '円';
 }
+
+/** ルール名（モード表示・結果画面・コピー文用） */
+export const RULE_NAMES: Record<Rule, string> = { fx: '📈FX式', binary: '🎯ハイロー', martingale: '🔥倍賭けハイロー' };
