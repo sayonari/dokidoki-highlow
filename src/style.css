@@ -370,3 +370,30 @@ button { font-family: inherit; font-weight: 800; color: inherit; cursor: pointer
 .game-root.calm .fx-pop, .game-root.calm .fx-pop.win, .game-root.calm .fx-pop.lose { animation-duration: 1.4s; text-shadow: none; }
 .game-root.calm .fx-pop.win .pop-main { text-shadow: none; }
 .game-root.calm .fx-spurt { animation: none; }
+
+/* ---- 1回の掛け金スライダー（ui/stake.ts） ---- */
+.stake-bar { --thumb: 28px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 44px; margin-top: 6px; padding: 2px 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); }
+.stake-lab { display: flex; flex-direction: column; line-height: 1.15; font-size: 12px; font-weight: 800; color: var(--dim); white-space: nowrap; }
+.stake-lab-sub { font-size: 10px; color: var(--gold); }
+.stake-track { position: relative; height: 40px; min-width: 0; }
+.stake-range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; touch-action: pan-y; cursor: pointer; }
+.stake-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--gold) calc(var(--p, 0) * 100%), rgba(255, 255, 255, 0.18) 0); }
+.stake-range::-moz-range-track { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); }
+.stake-range::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--gold); }
+.stake-range::-webkit-slider-thumb { -webkit-appearance: none; width: var(--thumb); height: var(--thumb); margin-top: calc((6px - var(--thumb)) / 2); border-radius: 50%; border: 3px solid #fff; background: radial-gradient(circle at 35% 30%, #ffe680, #ffb300); box-shadow: 0 0 10px rgba(255, 210, 63, 0.8); }
+.stake-range::-moz-range-thumb { width: calc(var(--thumb) - 6px); height: calc(var(--thumb) - 6px); border-radius: 50%; border: 3px solid #fff; background: radial-gradient(circle at 35% 30%, #ffe680, #ffb300); box-shadow: 0 0 10px rgba(255, 210, 63, 0.8); }
+.stake-range:focus-visible { outline: none; }
+.stake-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--cyan), 0 0 10px rgba(255, 210, 63, 0.8); }
+.stake-ticks { position: absolute; left: 0; right: 0; top: 50%; height: 0; pointer-events: none; }
+.stake-tick { position: absolute; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgba(255, 255, 255, 0.75); left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--i) / 7); top: -14px; }
+.stake-tick.dim { background: rgba(255, 255, 255, 0.18); }
+.stake-amt { min-width: 5.6em; text-align: right; font-size: clamp(18px, 5vw, 24px); font-weight: 900; color: var(--gold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stake-amt.bump { animation: bump 0.45s cubic-bezier(.2, 1.8, .4, 1); display: block; }
+.play.fx-calm .stake-amt.bump { animation: none; }
+.stake-bar.compact { margin-top: 0; background: transparent; border: none; padding: 0; }
+@media (max-width: 400px) {
+  .stake-bar { gap: 6px; padding: 2px 8px; }
+  .stake-lab { font-size: 11px; }
+  .stake-amt { min-width: 5em; }
+}
+.stake-bar.compact { grid-template-columns: minmax(0, 1fr) auto; }

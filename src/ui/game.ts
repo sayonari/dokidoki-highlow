@@ -6,6 +6,7 @@ import { sfx } from '../audio/sfx';
 import { Effects } from '../fx/effects';
 import { Chart } from './chart';
 import { saveSettings, type FxLevel, type Settings } from './settings';
+import { createStakeSlider, type StakeSlider } from './stake';
 import { RULE_NAMES, bigYen, clamp, h, sleep, yen } from './util';
 
 export interface GameResult {
@@ -78,6 +79,10 @@ export class Game {
   private btnsBox!: HTMLElement;
   private wrapBox!: HTMLElement;
   private cans = new Map<Dir, HTMLElement>();
+  private notes = new Map<Dir, HTMLElement>();
+  private stakeBar!: StakeSlider;
+  /** 建玉ごとの発注時の「基本の掛け金」（途中で掛け金を変えても演出の強さが崩れないように） */
+  private posBase = new Map<number, number>();
 
   // HUD 要素
   private elEq!: HTMLElement;
@@ -209,10 +214,17 @@ export class Game {
     this.btnUp = this.makeBtn(1);
     this.btnDown = this.makeBtn(-1);
     btns.append(this.btnUp, this.btnDown);
+    this.stakeBar = createStakeSlider({
+      label: this.e.rule === 'martingale' ? '💰 基本の掛け金' : '💰 1回の掛け金',
+      value: this.cfg.marginPerShot,
+      onChange: (v) => this.changeStake(v),
+    });
+    this.stakeBar.el.classList.add('play-stake');
+    this.stakeBar.input.addEventListener('keydown', this.onSliderKey);
 
     this.btnsBox = btns;
     this.wrapBox = wrap;
-    this.stage.append(tools, hud, stats, this.elMeter, this.mbar, this.hiloInfo, wrap, btns);
+    this.stage.append(tools, hud, stats, this.elMeter, this.mbar, this.hiloInfo, wrap, this.stakeBar.el, btns);
     this.stage.addEventListener('contextmenu', (ev) => ev.preventDefault());
   }
 
@@ -234,7 +246,11 @@ export class Game {
     this.badges.set(dir, badge);
     this.shorts.set(dir, short);
     b.append(head, bet, mgTag, can);
-    if (!this.bin) b.append(h('span', 'btn-note', note));
+    if (!this.bin) {
+      const noteEl = h('span', 'btn-note', note);
+      this.notes.set(dir, noteEl);
+      b.append(noteEl);
+    }
     b.append(badge, short);
     b.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
@@ -401,7 +417,27 @@ export class Game {
     }
   }
 
+  /** 掛け金を変える（次の発注から有効） */
+  private changeStake(v: number) {
+    this.e.setStake(v);
+    this.o.settings.margin = v;
+    saveSettings(this.o.settings);
+    this.stakeBar.bump();
+    sfx.click('up');
+  }
+
+  /** スライダーにフォーカスがあるとき：←→ 以外（↑↓ など）はスライダーを動かさず発注側へ回す */
+  private onSliderKey = (ev: KeyboardEvent) => {
+    if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown' || ev.key === 'Home' || ev.key === 'End' || ev.key === 'PageUp' || ev.key === 'PageDown') ev.preventDefault();
+  };
+
   private onKey = (ev: KeyboardEvent) => {
+    if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
+      if (this.modalEl || this.ended) return;
+      ev.preventDefault();
+      this.stakeBar.step(ev.key === 'ArrowRight' ? 1 : -1);
+      return;
+    }
     if (ev.repeat) return;
     const k = ev.key;
     let dir: Dir | 0 = 0;
@@ -452,6 +488,8 @@ export class Game {
     const ev = this.e.open(dir);
     const btn = dir > 0 ? this.btnUp : this.btnDown;
     if (ev.k === 'open') {
+      this.posBase.set(ev.pos.id, this.cfg.marginPerShot);
+      this.log.maxStakeMult = Math.max(this.log.maxStakeMult, Math.round(ev.pos.margin / this.cfg.marginPerShot));
       sfx.click(dir > 0 ? 'up' : 'down');
       const br = btn.getBoundingClientRect();
       const cr = this.canvas.getBoundingClientRect();
@@ -512,7 +550,6 @@ export class Game {
 
   /** prev = step 前の建玉（ロスカットで閉じた建玉のスプレッド計算用） */
   private handle(evs: EngineEvent[], prev: Position[]) {
-    const m = this.cfg.marginPerShot;
     const cr = this.canvas.getBoundingClientRect();
     const log = this.log;
     const settled = new Set<number>();
@@ -522,6 +559,10 @@ export class Game {
         if (!this.bin) log.spreadCost += (ev.pos.units * this.e.spread) / 2 / 1000;
         log.settles.push(ev.pnl);
         log.biggestWin = Math.max(log.biggestWin, ev.pnl);
+        if (!this.bin) log.bestWinRatio = Math.max(log.bestWinRatio, ev.pnl / ev.pos.margin);
+        // 演出の基準：FX式はその建玉の証拠金，ハイローは発注時の基本の掛け金
+        const m = this.bin ? (this.posBase.get(ev.pos.id) ?? ev.pos.margin) : ev.pos.margin;
+        this.posBase.delete(ev.pos.id);
         log.biggestLoss = Math.min(log.biggestLoss, ev.pnl);
         this.tutAdvance(2);
         const tip = this.chart.tip(ev.exitMid);
@@ -739,6 +780,9 @@ export class Game {
     const accepting = e.acceptingOrders;
     const afford = e.canAfford();
     const stake = e.nextStake();
+    const avail = this.bin ? e.balance - used : e.freeMargin();
+    this.stakeBar.dim(avail, (v) => (e.rule === 'martingale' ? v * 2 ** e.mgLevel : v));
+    this.stakeBar.setSub(e.rule === 'martingale' ? `次は${yen(stake)}円（×${2 ** e.mgLevel}）` : '');
     const can = accepting ? Math.floor(((this.bin ? e.balance - used : e.freeMargin()) + 1e-6) / stake) : 0;
     let shortText = '';
     if (!accepting) shortText = '時間切れ・決済待ち';
@@ -751,6 +795,10 @@ export class Game {
       let sum = 0;
       for (const p of e.positions) if (p.dir === dir) sum += p.margin;
       this.setText(badge, 'badge' + dir, `かけ中 ${n}回・${yen(sum)}円`);
+      if (!this.bin) {
+        this.setText(this.bets.get(dir)!, 'bet' + dir, `1回 ${yen(stake)}円`);
+        this.setText(this.notes.get(dir)!, 'note' + dir, `×${this.cfg.leverage}倍＝約${bigYen(stake * this.cfg.leverage)}分の取引`);
+      }
       if (this.bin) {
         const bet = this.bets.get(dir)!;
         this.setText(bet, 'bet' + dir, this.e.rule === 'martingale' ? `次の賭け金 ${yen(stake)}円` : `1回 ${yen(stake)}円\n→ 当たれば ${yen(stake * e.payout)}円`);

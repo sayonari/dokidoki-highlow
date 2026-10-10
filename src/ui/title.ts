@@ -7,6 +7,7 @@ import { saveSettings } from './settings';
 import type { FxLevel, Settings } from './settings';
 import { ACHIEVEMENTS, loadRecords } from './records';
 import { h, yen } from './util';
+import { createStakeSlider } from './stake';
 
 export { REPLAY };
 
@@ -108,7 +109,7 @@ export class TitleScreen {
     const summary = h('p', 'start-summary', '');
     this.refreshers.push(() => {
       const m = MODES.find((x) => x.id === s.mode)!;
-      summary.textContent = `いまの設定：${m.icon}${m.name}／レバレッジ${s.leverage}倍（FX式のみ）／1回${s.margin.toLocaleString('ja-JP')}円／${s.holdSec}秒で決済／${s.roundSec}秒`;
+      summary.textContent = `いまの設定：${m.icon}${m.name}／レバレッジ${s.leverage}倍（FX式のみ）／1回${yen(s.margin)}円／${s.holdSec}秒で決済／${s.roundSec}秒`;
     });
     inner.append(summary);
     const recLine = this.recordLine();
@@ -150,7 +151,22 @@ export class TitleScreen {
     det.append(more);
     inner.append(det);
 
-    this.chips(this.section(more, '1発の証拠金'), 'margin', [5000, 10000, 30000].map((v) => ({ v, label: `${v.toLocaleString('ja-JP')}円` })));
+    const stakeSec = this.section(more, '1回の掛け金');
+    const stakeSl = createStakeSlider({
+      label: '1回の掛け金',
+      value: s.margin,
+      compact: true,
+      onChange: (v) => {
+        sfx.unlock();
+        sfx.click('up');
+        s.margin = v;
+        this.refresh();
+      },
+    });
+    stakeSl.input.setAttribute('aria-label', '1回の掛け金');
+    stakeSec.append(stakeSl.el);
+    stakeSec.querySelector('.stake-lab')?.classList.add('hidden');
+    this.refreshers.push(() => stakeSl.set(s.margin));
     this.chips(this.section(more, '自動決済までの秒数'), 'holdSec', [3, 5, 10].map((v) => ({ v, label: `${v}秒` })));
     this.chips(this.section(more, 'ラウンド時間'), 'roundSec', [30, 60, 90, 180].map((v) => ({ v, label: `${v}秒`, badge: v === 30 ? '30秒チャレンジ' : undefined })));
     this.chips(

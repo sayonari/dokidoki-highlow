@@ -13,7 +13,7 @@ export function educationalNote(r: GameResult): string {
   const e = r.engine;
   const id = r.cfg.mode.id;
   const L = r.cfg.leverage;
-  if (e.rule === 'martingale') return `倍賭けは連敗すると 1万→2万→4万→8万…と賭け金が一気にふくらみ，すぐに払えなくなります（今回の最大の賭け金：${yen(e.maxStake)}円）`;
+  if (e.rule === 'martingale') return `倍賭けは連敗すると 基本の掛け金が倍々（×1→×2→×4→×8…）と賭け金が一気にふくらみ，すぐに払えなくなります（今回の最大の賭け金：${yen(e.maxStake)}円）`;
   if (e.rule === 'binary') return '払い戻し1.85倍のハイローは，勝率54%以上でないと平均でお金が減ります．数秒後の上下はほぼ五分五分なので，続けるほど減っていきます';
   if (id === 'mustwin') return '「必ず勝ち越し」は現実には存在しません．「絶対もうかる」と言われたら詐欺を疑おう';
   if (id === 'mustlose') return '「必ず負け越し」は胴元が値動きを操作した場合の姿．取引相手が信頼できるかはとても大事';
@@ -284,7 +284,7 @@ export class ResultScreen {
       const total = e.wins + e.losses;
       li(`トントンに必要な勝率：${(100 / e.payout).toFixed(1)}%（1÷${e.payout}）／今回の勝率：${total ? Math.round((e.wins / total) * 100) : 0}%`);
       if (e.rule === 'martingale') {
-        li(`最大の賭け金：${yen(e.maxStake)}円（倍賭け${Math.round(Math.log2(e.maxStake / cfg.marginPerShot))}段）`, 'hl');
+        li(`最大の賭け金：${yen(e.maxStake)}円（倍賭け${Math.round(Math.log2(log.maxStakeMult))}段）`, 'hl');
         li('払い戻し1.85倍のハイローは，勝率54%以上でないと平均でお金が減ります．数秒後の上下はほぼ五分五分なので，続けるほど減っていきます');
       }
     } else li(`今回のコスト（スプレッド＝売値と買値の差）：${yen(log.spreadCost)}円`);

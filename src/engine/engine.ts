@@ -111,6 +111,10 @@ export class Engine {
   get payout(): number {
     return this.cfg.payout ?? DEFAULT_PAYOUT;
   }
+  /** 1回の掛け金（証拠金）をゲーム途中で変える．次の発注から有効で，建玉中のものは変わらない */
+  setStake(yen: number): void {
+    this.cfg.marginPerShot = Math.max(100, Math.round(yen));
+  }
   /** 次の1発の金額（倍賭けなら段数ぶん2倍ずつ） */
   nextStake(): number {
     return this.rule === 'martingale' ? this.cfg.marginPerShot * 2 ** this.mgLevel : this.cfg.marginPerShot;

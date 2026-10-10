@@ -20,6 +20,10 @@ export interface RoundLog {
   /** 最大の1発の勝ち・負け [円]（負けは負の値） */
   biggestWin: number;
   biggestLoss: number;
+  /** 1発の勝ちが，その建玉の掛け金の何倍だったかの最大（FX式の爆益判定用．途中で掛け金を変えても崩れない） */
+  bestWinRatio: number;
+  /** 倍賭けで，発注時の「基本の掛け金」に対する賭け金の倍率の最大（1,2,4,8…） */
+  maxStakeMult: number;
   /** 最も多く同時に持っていた建玉数 */
   maxOpen: number;
   /** ゼロカットで免除された額 [円]（engine.zeroCutTotal の写し） */
@@ -29,5 +33,5 @@ export interface RoundLog {
 }
 
 export function newRoundLog(): RoundLog {
-  return { aborted: false, spreadCost: 0, taps: { up: 0, down: 0 }, settles: [], losscuts: [], jackpots: 0, biggestWin: 0, biggestLoss: 0, maxOpen: 0, zeroCut: 0 };
+  return { aborted: false, spreadCost: 0, taps: { up: 0, down: 0 }, settles: [], losscuts: [], jackpots: 0, biggestWin: 0, biggestLoss: 0, bestWinRatio: 0, maxStakeMult: 1, maxOpen: 0, zeroCut: 0 };
 }

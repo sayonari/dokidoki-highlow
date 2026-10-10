@@ -78,7 +78,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first', icon: '🌱', name: 'はじめての取引', desc: '1回以上発注した', hint: 'ボタンを1回おしてみよう', test: (c) => shotsOf(c) >= 1 },
   { id: 'jackpot', icon: '🎰', name: '大当たり！', desc: '5連勝した', hint: '連勝をねらえ', test: (c) => c.engine.maxWinStreak >= 5 },
   { id: 'streak10', icon: '🔥', name: '10連勝', desc: '10連勝した', hint: '大当たりのその先へ', test: (c) => c.engine.maxWinStreak >= 10 },
-  { id: 'bigwin', icon: '💥', name: '爆益', desc: '1発で証拠金の半分以上勝った', hint: '倍率が高いと1発が大きい…', test: (c) => fxOnly(c) && c.log.biggestWin >= c.cfg.marginPerShot * 0.5 },
+  { id: 'bigwin', icon: '💥', name: '爆益', desc: '1発で証拠金の半分以上勝った', hint: '倍率が高いと1発が大きい…', test: (c) => fxOnly(c) && c.log.bestWinRatio >= 0.5 },
   { id: 'losscut', icon: '🚨', name: 'ロスカットを経験', desc: 'ロスカットを体験した', hint: '大きく逆行すると起きるかも', test: (c) => c.engine.losscuts > 0 },
   { id: 'zerocut', icon: '🛟', name: 'ゼロカットを経験', desc: 'ゼロカットが発動した', hint: '値が急に飛ぶと…', test: (c) => c.engine.zeroCutTotal > 0 },
   { id: 'lev1000', icon: '🚀', name: '1000倍で生還', desc: '1000倍で10回以上取引し，ロスカット0で終了', hint: '超危険な倍率で，無傷で終えられる？', test: (c) => fxOnly(c) && c.cfg.leverage === 1000 && c.engine.shots >= 10 && c.engine.losscuts === 0 },
@@ -92,7 +92,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'rapid', icon: '👆', name: '連打王', desc: '1ラウンドで100回以上発注', hint: 'とにかく連打！', test: (c) => shotsOf(c) >= 100 },
   { id: 'sec30', icon: '⏱️', name: '30秒チャレンジ成功', desc: '30秒ラウンドでプラス', hint: '30秒のラウンドで勝とう', test: (c) => c.cfg.roundMs === 30000 && pnlOf(c) > 0 },
   { id: 'hilo', icon: '🎯', name: 'ハイロー体験', desc: 'ハイロー（本物・倍賭け）を1回遊んだ', hint: 'スタートで「ハイロー」を選ぼう', test: (c) => c.engine.isBinary },
-  { id: 'mgfear', icon: '😱', name: '倍賭けの恐怖', desc: '倍賭けで賭け金が1発の8倍以上にふくらんだ', hint: '倍賭けハイローで連敗してみよう…', test: (c) => c.engine.rule === 'martingale' && c.engine.maxStake >= c.cfg.marginPerShot * 8 },
+  { id: 'mgfear', icon: '😱', name: '倍賭けの恐怖', desc: '倍賭けで賭け金が1発の8倍以上にふくらんだ', hint: '倍賭けハイローで連敗してみよう…', test: (c) => c.engine.rule === 'martingale' && c.log.maxStakeMult >= 8 },
   { id: 'hilowin', icon: '🎲', name: 'ハイローで勝ち越し', desc: 'ハイロー系でプラス終了', hint: '勝率54%以上が必要…運をつかめ', test: (c) => c.engine.isBinary && pnlOf(c) > 0 },
 ];
 
