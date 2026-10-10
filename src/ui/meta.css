@@ -1,0 +1,40 @@
+/* 結果・記録・実績・タイトル折りたたみ（style.css は触らずここで追加・上書き） */
+.best-band { background: linear-gradient(90deg, #b8860b, #ffd23f, #fff2a8, #ffd23f, #b8860b); color: #3a2300; font-weight: 900; font-size: clamp(18px, 5vw, 26px); border-radius: 12px; padding: 6px 10px; box-shadow: 0 0 22px rgba(255, 210, 63, 0.85); animation: popIn 0.6s cubic-bezier(.2, 1.5, .4, 1); }
+.verdict { font-size: clamp(30px, 9vw, 52px); }
+.res-title { font-size: clamp(16px, 4.5vw, 22px); color: var(--cyan); font-weight: 800; }
+.res-wl { background: var(--panel); border-radius: 12px; padding: 8px; }
+.res-wl-main { font-size: clamp(17px, 4.8vw, 22px); font-weight: 800; }
+.res-wl-note { font-size: 11px; color: var(--dim); margin-top: 2px; }
+.res-best { font-size: 13px; color: var(--dim); }
+.res-best-hit { color: var(--gold); font-weight: 800; }
+.res-grid { grid-template-columns: repeat(4, 1fr); }
+.review { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; text-align: left; display: grid; gap: 6px; font-size: 14px; line-height: 1.5; }
+.review-title { color: var(--cyan); font-weight: 800; font-size: 15px; }
+.review-item.hl { color: var(--gold); font-weight: 700; }
+.guess-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 8px 0; }
+.guess-verdict { font-size: 20px; font-weight: 800; margin-top: 4px; }
+.guess-verdict.ok { color: var(--gold); }
+.guess-verdict.ng { color: var(--lose); }
+.lev-retry { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+.lev-retry-label { font-size: 13px; color: var(--dim); }
+.copy-out { width: 100%; min-height: 3.2em; background: rgba(0, 0, 0, 0.4); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px; font: inherit; }
+.copy-out[hidden] { display: none; }
+.ach-pop-host { position: fixed; inset: 0; z-index: 120; pointer-events: none; display: grid; place-items: center; }
+.ach-pop { background: var(--bg2); border: 3px solid var(--gold); border-radius: 22px; padding: 16px 28px; text-align: center; box-shadow: 0 0 40px rgba(255, 210, 63, 0.8); animation: popIn 0.5s cubic-bezier(.2, 1.6, .4, 1); }
+.ach-pop-tag { color: var(--gold); font-weight: 900; font-size: 14px; }
+.ach-pop-icon { font-size: 56px; line-height: 1.2; }
+.ach-pop-name { font-size: 24px; font-weight: 900; }
+.ach-pop-desc { font-size: 13px; color: var(--dim); }
+.rec-line { text-align: center; font-size: 13px; color: var(--gold); margin: 4px 0; }
+.more-settings, .ach-book { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 12px; }
+.more-settings > summary, .ach-book > summary { cursor: pointer; font-weight: 800; font-size: 16px; color: var(--cyan); }
+.more-body { margin-top: 10px; }
+.ach-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 10px; }
+.ach-item { display: flex; gap: 10px; align-items: center; background: rgba(255, 255, 255, 0.04); border-radius: 12px; padding: 8px; opacity: 0.65; }
+.ach-item.on { opacity: 1; border: 1px solid var(--gold); }
+.ach-icon { font-size: 28px; }
+.ach-name { font-weight: 800; font-size: 14px; }
+.ach-desc { font-size: 12px; color: var(--dim); }
+/* 結果が長くなったのでスクロールできるように */
+.result { height: 100dvh; overflow-x: hidden; overflow-y: auto; }
+.result .halo { position: fixed; }

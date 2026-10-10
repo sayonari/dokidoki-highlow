@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ドキドキFX 音デモ</title>
+<style>
+  body { font-family: sans-serif; padding: 16px; background: #222; color: #fff; }
+  #buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  button { font-size: 16px; padding: 10px 14px; border-radius: 8px; border: 0; background: #f6a; color: #fff; }
+</style>
+</head>
+<body>
+<h1>ドキドキFX 音デモ</h1>
+<label>音量 <input id="vol" type="range" min="0" max="1" step="0.05" value="0.8"></label>
+<label><input id="en" type="checkbox" checked> 音ON</label>
+<label><input id="vo" type="checkbox" checked> ボイスON</label>
+<div id="buttons"></div>
+<script type="module" src="/src/audio/demo.ts"></script>
+</body>
+</html>
