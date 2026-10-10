@@ -293,7 +293,8 @@ export class Effects {
     }
     this.jackpotBusy = true;
     const root = h('div', 'fx-jackpot' + (isSuper ? ' super' : ''));
-    const txt = h('div', 'jp-text', main);
+    // 「5連勝!!! 大当たり!!」は空白で2行に分け，単語の途中で折り返さないようにする
+    const txt = h('div', 'jp-text', main.replace(' ', '\n'));
     root.append(h('div', 'jp-dim'), txt, h('div', 'jp-sub', sub));
     this.layer.appendChild(root);
     this.jpRoot = root;

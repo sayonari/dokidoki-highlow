@@ -234,7 +234,7 @@ button { font-family: inherit; font-weight: 800; color: inherit; cursor: pointer
 .fx-jackpot.out { opacity: 0; }
 .jp-dim { position: absolute; inset: 0; background: radial-gradient(circle, rgba(60, 0, 80, 0.55), rgba(0, 0, 0, 0.8)); animation: fadeInOut 3.7s ease-in-out forwards; }
 .jp-text {
-  position: relative; font-size: clamp(44px, 12.5vw, 150px); line-height: 1.15; text-align: center; font-weight: 900; color: var(--gold);
+  position: relative; font-size: clamp(44px, 12.5vw, 150px); line-height: 1.15; text-align: center; white-space: pre-line; word-break: keep-all; font-weight: 900; color: var(--gold);
   -webkit-text-stroke: 5px #d4002a; paint-order: stroke fill; text-shadow: 0 0 40px #ff9f00, 6px 6px 0 rgba(0, 0, 0, 0.5); animation: slamIn 0.7s cubic-bezier(.2, 1.4, .4, 1) both, rainbowHue 0.8s linear infinite;
 }
 .fx-jackpot.super .jp-text { font-size: clamp(40px, 11vw, 140px); }
